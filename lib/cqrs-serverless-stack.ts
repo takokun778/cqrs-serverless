@@ -27,6 +27,10 @@ export class CQRSServerlessStack extends Stack {
                 name: 'id',
                 type: aws_dynamodb.AttributeType.STRING,
             },
+            sortKey: {
+                name: 'createdAt',
+                type: aws_dynamodb.AttributeType.NUMBER,
+            },
             billingMode: aws_dynamodb.BillingMode.PAY_PER_REQUEST,
             stream: StreamViewType.NEW_IMAGE,
         });
