@@ -5,6 +5,7 @@ import { Effect, Policy, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk
 import { Architecture, Function, FunctionProps, Runtime, StartingPosition } from 'aws-cdk-lib/aws-lambda';
 import { DynamoEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
+import { BlockPublicAccess, Bucket } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -14,6 +15,11 @@ import { Lambda, lambdaProps } from './lambda/lambda';
 export class CQRSServerlessStack extends Stack {
     constructor(scope: Construct, id: string, props?: StackProps) {
         super(scope, id, props);
+
+        const bucket = new Bucket(this, `${id}-s3-bucket`, {
+            bucketName: `${id}-s3-bucket`,
+            blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+        });
 
         const eventTable = new aws_dynamodb.Table(this, `${id}-dynamodb-event-table`, {
             tableName: `${id}-dynamodb-event-table`,
@@ -74,7 +80,7 @@ export class CQRSServerlessStack extends Stack {
 
         const lambda: Lambda = {};
 
-        lambdaProps.forEach((prop) => {
+        lambdaProps(this, id).forEach((prop) => {
             const cwd = path.join(__dirname, '..', `lambda/${prop.name}`);
 
             const lambdaProps: FunctionProps = {
@@ -87,6 +93,10 @@ export class CQRSServerlessStack extends Stack {
                 handler: 'bootstrap',
                 code: goCode(cwd),
                 role: prop.role,
+                // TODO 環境変数の管理
+                environment: {
+                    S3_BUCKET_NAME: bucket.bucketName,
+                },
             };
 
             const func = new Function(this, `${id}-lambda-${prop.name}`, lambdaProps);
@@ -97,6 +107,15 @@ export class CQRSServerlessStack extends Stack {
         lambda['consumer'].addEventSource(
             new DynamoEventSource(eventTable, {
                 startingPosition: StartingPosition.LATEST,
+            })
+        );
+
+        bucket.addToResourcePolicy(
+            new PolicyStatement({
+                effect: Effect.ALLOW,
+                actions: ['s3:PutObject'],
+                principals: [lambda['consumer'].grantPrincipal],
+                resources: [`${bucket.bucketArn}/*`],
             })
         );
 

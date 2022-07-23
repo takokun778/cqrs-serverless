@@ -1,5 +1,6 @@
 import { Role } from 'aws-cdk-lib/aws-iam';
 import { Function } from 'aws-cdk-lib/aws-lambda';
+import { Construct } from 'constructs';
 
 export type Lambda = {
     [index: string]: Function;
@@ -11,17 +12,13 @@ type LambdaProp = {
     role?: Role;
 };
 
-export const lambdaProps: LambdaProp[] = [
-    // {
-    //     name: 'command',
-    //     memorySize: 128,
-    // },
-    // {
-    //     name: 'query',
-    //     memorySize: 128,
-    // },
-    {
-        name: 'consumer',
-        memorySize: 128,
-    },
-];
+type LambdaProps = (scope: Construct, id: string) => LambdaProp[];
+
+export const lambdaProps: LambdaProps = (scope: Construct, id: string) => {
+    return [
+        {
+            name: 'consumer',
+            memorySize: 128,
+        },
+    ];
+};
