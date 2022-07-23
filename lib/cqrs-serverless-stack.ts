@@ -47,6 +47,123 @@ export class CQRSServerlessStack extends Stack {
 
         eventTableRole.attachInlinePolicy(eventTablePolicy);
 
+        const createEventIntegration = new aws_apigateway.AwsIntegration({
+            service: 'dynamodb',
+            action: 'PutItem',
+            options: {
+                credentialsRole: eventTableRole,
+                requestTemplates: {
+                    'application/json': `{
+                        "TableName": "${eventTable.tableName}",
+                        "Item": {
+                            "id": {
+                                "S": "$context.requestId"
+                            },
+                            "command": {
+                                "S": "create"
+                            },
+                            "key": {
+                                "S": "$input.path('$.key')"
+                            },
+                            "value": {
+                                "S": "$input.path('$.value')"
+                            },
+                            "createdAt": {
+                                "N": "$context.requestTimeEpoch"
+                            }
+                        }
+                    }`,
+                },
+                integrationResponses: [
+                    {
+                        statusCode: '200',
+                        responseTemplates: {
+                            'application/json': `{
+                                "requestId": "$context.requestId"
+                            }`,
+                        },
+                    },
+                ],
+            },
+        });
+
+        const updateEventIntegration = new aws_apigateway.AwsIntegration({
+            service: 'dynamodb',
+            action: 'PutItem',
+            options: {
+                credentialsRole: eventTableRole,
+                requestTemplates: {
+                    'application/json': `{
+                        "TableName": "${eventTable.tableName}",
+                        "Item": {
+                            "id": {
+                                "S": "$context.requestId"
+                            },
+                            "command": {
+                                "S": "update"
+                            },
+                            "key": {
+                                "S": "$input.path('$.key')"
+                            },
+                            "value": {
+                                "S": "$input.path('$.value')"
+                            },
+                            "createdAt": {
+                                "N": "$context.requestTimeEpoch"
+                            }
+                        }
+                    }`,
+                },
+                integrationResponses: [
+                    {
+                        statusCode: '200',
+                        responseTemplates: {
+                            'application/json': `{
+                                "requestId": "$context.requestId"
+                            }`,
+                        },
+                    },
+                ],
+            },
+        });
+
+        const deleteEventIntegration = new aws_apigateway.AwsIntegration({
+            service: 'dynamodb',
+            action: 'PutItem',
+            options: {
+                credentialsRole: eventTableRole,
+                requestTemplates: {
+                    'application/json': `{
+                        "TableName": "${eventTable.tableName}",
+                        "Item": {
+                            "id": {
+                                "S": "$context.requestId"
+                            },
+                            "command": {
+                                "S": "delete"
+                            },
+                            "key": {
+                                "S": "$input.path('$.key')"
+                            },
+                            "createdAt": {
+                                "N": "$context.requestTimeEpoch"
+                            }
+                        }
+                    }`,
+                },
+                integrationResponses: [
+                    {
+                        statusCode: '200',
+                        responseTemplates: {
+                            'application/json': `{
+                                "requestId": "$context.requestId"
+                            }`,
+                        },
+                    },
+                ],
+            },
+        });
+
         const eventPutIntegration = new aws_apigateway.AwsIntegration({
             service: 'dynamodb',
             action: 'PutItem',
@@ -113,7 +230,7 @@ export class CQRSServerlessStack extends Stack {
         bucket.addToResourcePolicy(
             new PolicyStatement({
                 effect: Effect.ALLOW,
-                actions: ['s3:PutObject'],
+                actions: ['s3:PutObject', 's3:DeleteObject'],
                 principals: [lambda['consumer'].grantPrincipal],
                 resources: [`${bucket.bucketArn}/*`],
             })
@@ -148,7 +265,40 @@ export class CQRSServerlessStack extends Stack {
 
         const commandApi = api.addResource('command');
 
+        const commandCreateApi = commandApi.addResource('create');
+
+        const commandUpdateApi = commandApi.addResource('update');
+
+        const commandDeleteApi = commandApi.addResource('delete');
+
         commandApi.addMethod('POST', eventPutIntegration, {
+            apiKeyRequired: true,
+            methodResponses: [
+                {
+                    statusCode: '200',
+                },
+            ],
+        });
+
+        commandCreateApi.addMethod('POST', createEventIntegration, {
+            apiKeyRequired: true,
+            methodResponses: [
+                {
+                    statusCode: '200',
+                },
+            ],
+        });
+
+        commandUpdateApi.addMethod('POST', updateEventIntegration, {
+            apiKeyRequired: true,
+            methodResponses: [
+                {
+                    statusCode: '200',
+                },
+            ],
+        });
+
+        commandDeleteApi.addMethod('POST', deleteEventIntegration, {
             apiKeyRequired: true,
             methodResponses: [
                 {

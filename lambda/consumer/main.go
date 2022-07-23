@@ -48,21 +48,38 @@ func Handle(ctx context.Context, event events.DynamoDBEvent) error {
 
 		command := record.Change.NewImage["command"].String()
 
+		key := record.Change.NewImage["key"].String()
+
+		value := record.Change.NewImage["value"].String()
+
 		log.Printf("command: %s\n", command)
 
 		switch command {
-		case "create":
+		case "create", "update":
 			param := &s3.PutObjectInput{
-				Bucket:                  aws.String(bucket),
-				Key:                     aws.String(id),
-				Body:                    strings.NewReader(""),
-				WebsiteRedirectLocation: aws.String("http://example.com/"),
+				Bucket: aws.String(bucket),
+				Key:    aws.String(key),
+				Body:   strings.NewReader(""),
+				Metadata: map[string]string{
+					"value": value,
+				},
 			}
 
 			if _, err := client.PutObject(ctx, param); err != nil {
 				log.Println(err.Error())
 
-				return nil
+				continue
+			}
+		case "delete":
+			param := &s3.DeleteObjectInput{
+				Bucket: aws.String(bucket),
+				Key:    aws.String(key),
+			}
+
+			if _, err := client.DeleteObject(ctx, param); err != nil {
+				log.Println(err.Error())
+
+				continue
 			}
 		default:
 			log.Printf("id: %s\n", id)
