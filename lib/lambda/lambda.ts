@@ -20,5 +20,9 @@ export const lambdaProps: LambdaProps = (scope: Construct, id: string) => {
             name: 'consumer',
             memorySize: 128,
         },
+        {
+            name: 'scan',
+            memorySize: 128,
+        },
     ];
 };

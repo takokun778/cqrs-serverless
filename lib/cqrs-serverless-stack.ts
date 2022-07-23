@@ -217,6 +217,7 @@ export class CQRSServerlessStack extends Stack {
                 // TODO 環境変数の管理
                 environment: {
                     S3_BUCKET_NAME: bucket.bucketName,
+                    DYNAMODB_TABLE_NAME: eventTable.tableName,
                 },
             };
 
@@ -230,6 +231,16 @@ export class CQRSServerlessStack extends Stack {
                 startingPosition: StartingPosition.LATEST,
             })
         );
+
+        lambda['scan'].addToRolePolicy(
+            new PolicyStatement({
+                actions: ['dynamodb:*'],
+                effect: Effect.ALLOW,
+                resources: [eventTable.tableArn],
+            })
+        );
+
+        const eventsScanIntegration = new aws_apigateway.LambdaIntegration(lambda['scan'])
 
         bucket.addToResourcePolicy(
             new PolicyStatement({
@@ -267,6 +278,8 @@ export class CQRSServerlessStack extends Stack {
 
         const api = root.root.addResource('api');
 
+        const eventsApi = api.addResource('events');
+
         const commandApi = api.addResource('command');
 
         const commandCreateApi = commandApi.addResource('create');
@@ -274,6 +287,15 @@ export class CQRSServerlessStack extends Stack {
         const commandUpdateApi = commandApi.addResource('update');
 
         const commandDeleteApi = commandApi.addResource('delete');
+
+        eventsApi.addMethod('GET', eventsScanIntegration, {
+            apiKeyRequired: true,
+            methodResponses: [
+                {
+                    statusCode: '200',
+                },
+            ],
+        });
 
         commandApi.addMethod('POST', eventPutIntegration, {
             apiKeyRequired: true,
